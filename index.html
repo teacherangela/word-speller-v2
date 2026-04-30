@@ -22,7 +22,7 @@
             overflow: hidden; 
             -webkit-user-select: none; user-select: none;
             width: 100vw; height: 100vh;
-            /* touch-action: none removed from body to allow modal scrolling */
+            touch-action: none;
         }
 
         .screen { display: none; position: absolute; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: background 0.5s ease; }
@@ -46,7 +46,7 @@
             display: flex; flex-direction: column; overflow: hidden;
             background-size: cover; background-position: center;
             transition: opacity 0.3s, filter 0.3s, background-image 0.5s ease;
-            touch-action: none; /* Keep this to prevent lane scrolling during game */
+            touch-action: none;
         }
         .player-lane.frozen { opacity: 0.5; filter: grayscale(0.8); pointer-events: none !important; }
 
@@ -57,6 +57,12 @@
         .lane-name { font-weight: 700; font-size: 22px; color: #fff; margin: 0; text-transform: uppercase; }
         .lane-stats { display: flex; justify-content: space-around; align-items: center; font-size: 16px; margin-top: 5px; }
         .stat-box { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.3); }
+
+        .grid-container {
+            display: flex; flex-wrap: wrap; justify-content: center; align-content: center;
+            gap: 15px; padding: 20px; flex-grow: 1; margin-bottom: 160px;
+            pointer-events: auto;
+        }
 
         .speak-btn-container {
             position: absolute; bottom: 155px; left: 50%; transform: translateX(-50%); z-index: 150; pointer-events: auto;
@@ -91,12 +97,14 @@
         .word-slot.filled { border: 2px solid #6d1b3b; color: #fff; background: var(--accent); border-style: solid; }
 
         .word-card {
-            position: absolute; width: 45px; height: 55px; background: white; color: #6d1b3b;
+            width: 45px; height: 55px; background: white; color: #6d1b3b;
             border-radius: 10px; box-shadow: var(--shadow); font-weight: bold; 
             cursor: grab; touch-action: none; z-index: 100; font-size: 24px;
             user-select: none; display: flex; align-items: center; justify-content: center;
-            will-change: transform; border: 2px solid #f8bbd0;
+            border: 2px solid #f8bbd0;
         }
+        .word-card.bouncing { position: absolute; will-change: transform; }
+        .word-card.static { position: relative; cursor: pointer; }
         .word-card.size-2 { width: 55px; height: 70px; font-size: 32px; }
         .word-card.size-1 { width: 70px; height: 90px; font-size: 45px; }
 
@@ -105,12 +113,17 @@
         
         .top-btns { display: flex; gap: 15px; align-items: center; }
 
-        .music-wrapper { display: flex; align-items: center; gap: 10px; background: rgba(255, 240, 245, 0.4); padding: 5px; border-radius: 30px; transition: 0.3s; }
-        .volume-slider { 
-            width: 0; opacity: 0; transition: width 0.3s, opacity 0.3s; pointer-events: none;
-            -webkit-appearance: none; height: 10px; border-radius: 5px; background: #f8bbd0; outline: none;
+        .music-wrapper { 
+            display: flex; align-items: center; gap: 10px; background: rgba(255, 240, 245, 0.4); 
+            padding: 5px; border-radius: 30px; transition: 0.3s; pointer-events: auto; 
         }
-        .volume-slider.visible { width: 100px; opacity: 1; pointer-events: auto; }
+        .music-wrapper:hover .volume-slider { width: 100px; opacity: 1; pointer-events: auto; }
+
+        .volume-slider { 
+            width: 0; opacity: 0; transition: width 0.3s, opacity 0.3s; 
+            -webkit-appearance: none; height: 10px; border-radius: 5px; background: #f8bbd0; outline: none;
+            z-index: 5100; touch-action: auto;
+        }
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid white;
         }
@@ -119,8 +132,8 @@
             display: none; position: fixed; z-index: 6000; inset: 0; 
             background: rgba(45, 27, 36, 0.95); 
             overflow-y: auto; padding: 20px; 
-            -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
-            touch-action: pan-y; /* Specifically allow vertical touch panning */
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
         }
         .modal-content { background: #fff5f8; color: #333; margin: auto; padding: 30px; border-radius: 20px; max-width: 850px; position: relative; font-family: 'Fredoka', sans-serif; }
         
@@ -218,6 +231,19 @@
                 </div>
             </div>
 
+            <div class="setting-group" style="background: #fff0f5; border: 1px solid #f8bbd0; padding: 15px; border-radius: 12px; margin-top: 15px;">
+                <p>Letter Layout Mode:</p>
+                <div style="display: flex; gap: 10px;">
+                    <div class="toggle-btn" id="layout-bouncing" onclick="toggleLayout('bouncing')">BOUNCING</div>
+                    <div class="toggle-btn" id="layout-grid" onclick="toggleLayout('grid')">STATIONARY GRID</div>
+                </div>
+                <p style="margin-top: 15px;">Interaction Mode:</p>
+                <div style="display: flex; gap: 10px;">
+                    <div class="toggle-btn" id="interact-drag" onclick="toggleInteraction('drag')">DRAG & DROP</div>
+                    <div class="toggle-btn" id="interact-tap" onclick="toggleInteraction('tap')">TAP TO SELECT</div>
+                </div>
+            </div>
+
             <div class="setting-group">
                 <p>Progression Mode:</p>
                 <div style="display: flex; gap: 10px;">
@@ -300,6 +326,8 @@
         let importSync = true;
         let isSharedPace = false; 
         let showTTSButton = true;
+        let layoutMode = 'bouncing'; 
+        let interactionMode = 'drag';
         let sharedSentenceIdx = 0; 
         let mainBg = localStorage.getItem('teacherAngela_mainBg') || 'background.gif';
         
@@ -328,12 +356,6 @@
                 [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
             }
             return newArr;
-        }
-
-        function primeSpeech() {
-            window.speechSynthesis.cancel();
-            const prime = new SpeechSynthesisUtterance("");
-            window.speechSynthesis.speak(prime);
         }
 
         function speakWord(word, pIdx = null) {
@@ -381,26 +403,36 @@
         }
 
         window.onload = () => {
-            primeSpeech(); 
             updateMainBg(mainBg);
             setPlayers(1);
             setSpeed(3);
             toggleSync(true);
             toggleTTSButton(true);
+            toggleLayout('bouncing');
+            toggleInteraction('drag');
             toggleSharedPace(false);
-            setupPasteDetection();
             renderSentenceBank();
             
-            // Refined touch detection to allow scrolling in modal but block on game area
             document.addEventListener('touchmove', e => { 
                 const isInsideModal = e.target.closest('#settings-modal');
-                const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
-                
-                if (!isInsideModal && !isInput) {
+                const isInsideUI = e.target.closest('.ui-layer') || e.target.closest('.top-btns');
+                if (!isInsideModal && !isInsideUI) {
                     e.preventDefault(); 
                 }
             }, { passive: false });
         };
+
+        function toggleLayout(mode) {
+            layoutMode = mode;
+            document.getElementById('layout-bouncing').classList.toggle('active', mode === 'bouncing');
+            document.getElementById('layout-grid').classList.toggle('active', mode === 'grid');
+        }
+
+        function toggleInteraction(mode) {
+            interactionMode = mode;
+            document.getElementById('interact-drag').classList.toggle('active', mode === 'drag');
+            document.getElementById('interact-tap').classList.toggle('active', mode === 'tap');
+        }
 
         function toggleTTSButton(val) {
             showTTSButton = val;
@@ -420,35 +452,6 @@
             document.getElementById('sync-off').classList.toggle('active', !val);
         }
 
-        function setupPasteDetection() {
-            window.addEventListener('paste', (e) => {
-                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-                for (let index in items) {
-                    const item = items[index];
-                    if (item.kind === 'file' && item.type.includes('image')) {
-                        const blob = item.getAsFile();
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const dataUrl = event.target.result;
-                            const activeEl = document.activeElement;
-                            if (activeEl && activeEl.id.startsWith('sent-txt-')) {
-                                const sIdx = parseInt(activeEl.id.split('-').pop());
-                                sentenceBank[sIdx].bg = dataUrl;
-                                document.getElementById(`sent-prev-${sIdx}`).style.backgroundImage = `url(${dataUrl})`;
-                            } else if (activeEl && activeEl.id.startsWith('name-in-')) {
-                                const pIdx = parseInt(activeEl.id.split('-').pop());
-                                playerConfigs[pIdx].bg = dataUrl;
-                                document.getElementById(`preview-${pIdx}`).style.backgroundImage = `url(${dataUrl})`;
-                            } else if (activeEl && activeEl.id === 'main-bg-url') {
-                                updateMainBg(dataUrl);
-                            }
-                        };
-                        reader.readAsDataURL(blob);
-                    }
-                }
-            });
-        }
-
         function renderSentenceBank() {
             const container = document.getElementById('sentence-container');
             container.innerHTML = '';
@@ -459,7 +462,7 @@
                     <div class="sentence-row-top">
                         <span style="font-weight:bold; color:#ad1457; width:20px;">${i+1}</span>
                         <button class="btn" onclick="speakWord(sentenceBank[${i}].text)" style="padding: 5px 8px; font-size: 14px; margin:0; background: #f8bbd0; color: #880e4f;">🔊</button>
-                        <input type="text" id="sent-txt-${i}" class="input-field" value="${item.text}" placeholder="Main word" oninput="sentenceBank[${i}].text = this.value">
+                        <input type="text" class="input-field" value="${item.text}" placeholder="Main word" oninput="sentenceBank[${i}].text = this.value">
                         <div class="bg-preview" id="sent-prev-${i}" style="background-image: url(${item.bg || ''})"></div>
                         <button class="btn" onclick="document.getElementById('sent-file-${i}').click()" style="padding: 5px 10px; font-size: 12px; margin:0;">Upload</button>
                         <input type="file" id="sent-file-${i}" style="display:none" accept="image/*" onchange="handleSentenceBgUpload(${i}, this)">
@@ -467,7 +470,7 @@
                     </div>
                     <div class="sentence-row-bottom">
                         <span style="font-size: 12px; color:#c2185b; flex-shrink:0; font-weight: bold;">Distractors:</span>
-                        <input type="text" id="sent-dist-${i}" class="input-field" value="${item.distractors || ''}" placeholder="X,Y,Z..." oninput="sentenceBank[${i}].distractors = this.value">
+                        <input type="text" class="input-field" value="${item.distractors || ''}" placeholder="X,Y,Z..." oninput="sentenceBank[${i}].distractors = this.value">
                     </div>
                 `;
                 container.appendChild(row);
@@ -494,7 +497,6 @@
             localStorage.setItem('teacherAngela_mainBg', url);
             document.getElementById('intro-screen').style.backgroundImage = `linear-gradient(rgba(45, 27, 36, 0.6), rgba(45, 27, 36, 0.6)), url('${url}')`;
             document.getElementById('main-bg-preview').style.backgroundImage = `url('${url}')`;
-            document.getElementById('main-bg-url').value = (url.startsWith('data:') || url.includes('.gif')) && !url.startsWith('http') ? '' : url;
         }
 
         function handleMainBgUpload(input) {
@@ -508,23 +510,22 @@
 
         function toggleMusic() {
             const bgm = document.getElementById('bg-music');
-            const btns = [document.getElementById('music-btn-start'), document.getElementById('music-btn-game')];
-            const sliders = [document.getElementById('volume-start'), document.getElementById('volume-game')];
-            sliders.forEach(s => s.classList.toggle('visible'));
-            if (bgm.paused) {
-                bgm.play().catch(e => {});
-                musicPlaying = true;
-                btns.forEach(b => b.innerText = "🔊");
-            } else {
-                bgm.pause();
-                musicPlaying = false;
-                btns.forEach(b => b.innerText = "🔇");
+            if (bgm.paused) { 
+                bgm.play(); 
+                musicPlaying = true; 
+                document.getElementById('music-btn-start').innerText = "🔊";
+                document.getElementById('music-btn-game').innerText = "🔊";
+            } else { 
+                bgm.pause(); 
+                musicPlaying = false; 
+                document.getElementById('music-btn-start').innerText = "🔇";
+                document.getElementById('music-btn-game').innerText = "🔇";
             }
         }
 
-        function changeVolume(val) {
+        function changeVolume(val) { 
             const bgm = document.getElementById('bg-music');
-            bgm.volume = val;
+            bgm.volume = val; 
             document.getElementById('volume-start').value = val;
             document.getElementById('volume-game').value = val;
         }
@@ -575,13 +576,7 @@
             document.getElementById(`s-${n}`).classList.add('active');
         }
 
-        function openSettings() {
-            primeSpeech(); 
-            baseTimer = parseInt(document.getElementById('timer-input').value) || 60;
-            renderSentenceBank(); setPlayers(playerCount); setSpeed(gameSpeedLevel);
-            document.getElementById('settings-modal').style.display = 'block';
-        }
-
+        function openSettings() { document.getElementById('settings-modal').style.display = 'block'; }
         function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
 
         function applySettingsOnly() {
@@ -594,13 +589,10 @@
         }
 
         function toggleFullscreen() {
-            const doc = window.document;
-            const docEl = doc.documentElement;
-            if (!doc.fullscreenElement) docEl.requestFullscreen(); else doc.exitFullscreen();
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();
         }
 
         function saveAndStart() {
-            primeSpeech(); 
             applySettingsOnly();
             sharedSentenceIdx = 0; 
             playerConfigs.forEach(p => { 
@@ -635,6 +627,7 @@
                     </div>
                     <div class="lane-overlay" id="overlay-${i}">SPELLED!</div>
                     ${ttsHtml}
+                    <div id="grid-container-${i}" class="grid-container" style="display:${layoutMode === 'grid' ? 'flex' : 'none'}"></div>
                     <div class="sentence-dock p${i+1}-dock" id="dock-${i}"></div>
                 `;
                 boundary.appendChild(lane);
@@ -642,7 +635,7 @@
             }
             startTimer();
             if(physicsRequest) cancelAnimationFrame(physicsRequest);
-            physicsRequest = requestAnimationFrame(updatePhysics);
+            if(layoutMode === 'bouncing') physicsRequest = requestAnimationFrame(updatePhysics);
         }
 
         function setupPlayerSentence(pIdx) {
@@ -658,22 +651,22 @@
 
             const currentWordData = currentList[sIdx];
             const wordToSpell = currentWordData.text; 
-            
-            if(isSharedPace && pIdx === 0) {
-                speakWord(wordToSpell, pIdx);
-            }
+            if(isSharedPace && pIdx === 0) speakWord(wordToSpell, pIdx);
 
             let lettersToSpawn = wordToSpell.split("");
             if(currentWordData.distractors) {
                 const dists = currentWordData.distractors.split(",").map(d => d.trim()).filter(d => d !== "");
                 lettersToSpawn = lettersToSpawn.concat(dists);
             }
+            lettersToSpawn = shuffleArray(lettersToSpawn);
 
             const dock = document.getElementById(`dock-${pIdx}`);
             const lane = document.getElementById(`lane-${pIdx}`);
+            const grid = document.getElementById(`grid-container-${pIdx}`);
             if(currentWordData.bg) lane.style.backgroundImage = `url('${currentWordData.bg}')`;
 
             dock.innerHTML = '';
+            if(grid) grid.innerHTML = '';
             activeSentences[pIdx] = { words: wordToSpell.split(""), currentWordIdx: 0, wordFinished: false };
 
             let sizeSuffix = playerCount === 1 ? ' size-1' : (playerCount === 2 ? ' size-2' : '');
@@ -691,29 +684,37 @@
 
             lettersToSpawn.forEach(char => {
                 const card = document.createElement('div');
-                card.className = 'word-card' + sizeSuffix;
+                card.className = `word-card ${sizeSuffix} ${layoutMode === 'bouncing' ? 'bouncing' : 'static'}`;
                 card.innerText = char; 
-                lane.appendChild(card);
-
-                setTimeout(() => {
-                    const wordObj = {
-                        el: card, pIdx: pIdx,
-                        x: Math.random() * (lane.offsetWidth - card.offsetWidth),
-                        y: 180 + Math.random() * (lane.offsetHeight - 450),
-                        vx: (Math.random() > 0.5 ? 1 : -1) * (speedFactor * (0.8 + Math.random() * 0.4)),
-                        vy: (Math.random() > 0.5 ? 1 : -1) * (speedFactor * (0.8 + Math.random() * 0.4)),
-                        isDragging: false, pointerId: null,
-                        width: card.offsetWidth, height: card.offsetHeight
-                    };
+                
+                if(layoutMode === 'bouncing') {
+                    lane.appendChild(card);
+                    setTimeout(() => {
+                        const wordObj = {
+                            el: card, pIdx: pIdx,
+                            x: Math.random() * (lane.offsetWidth - card.offsetWidth),
+                            y: 180 + Math.random() * (lane.offsetHeight - 450),
+                            vx: (Math.random() > 0.5 ? 1 : -1) * (speedFactor * (0.8 + Math.random() * 0.4)),
+                            vy: (Math.random() > 0.5 ? 1 : -1) * (speedFactor * (0.8 + Math.random() * 0.4)),
+                            isDragging: false, pointerId: null,
+                            width: card.offsetWidth, height: card.offsetHeight
+                        };
+                        wordsInPlay.push(wordObj);
+                        attachEvents(wordObj);
+                    }, 10);
+                } else {
+                    grid.appendChild(card);
+                    const wordObj = { el: card, pIdx: pIdx, isDragging: false };
                     wordsInPlay.push(wordObj);
-                    attachPointerEvents(wordObj);
-                }, 10);
+                    attachEvents(wordObj);
+                }
             });
         }
 
         function updatePhysics() {
+            if(layoutMode !== 'bouncing') return;
             wordsInPlay.forEach(w => {
-                if (!w.isDragging) {
+                if (!w.isDragging && w.el.classList.contains('bouncing')) {
                     const lane = document.getElementById(`lane-${w.pIdx}`);
                     if(!lane) return;
                     const maxX = lane.offsetWidth - w.width;
@@ -729,49 +730,62 @@
             physicsRequest = requestAnimationFrame(updatePhysics);
         }
 
-        function attachPointerEvents(wObj) {
+        function attachEvents(wObj) {
             const el = wObj.el;
-            const lane = document.getElementById(`lane-${wObj.pIdx}`);
             
-            // pointerdown handles both touch and mouse
+            el.addEventListener('click', (e) => {
+                if(interactionMode === 'tap') handleAction(wObj, true);
+            });
+
             el.addEventListener('pointerdown', (e) => {
-                if(playerConfigs[wObj.pIdx].finished || playerConfigs[wObj.pIdx].frozen || activeSentences[wObj.pIdx].wordFinished) return;
+                if(interactionMode !== 'drag' || playerConfigs[wObj.pIdx].finished || playerConfigs[wObj.pIdx].frozen) return;
                 wObj.isDragging = true; wObj.pointerId = e.pointerId; el.setPointerCapture(e.pointerId);
                 const rect = el.getBoundingClientRect();
                 wObj.offsetX = e.clientX - rect.left; wObj.offsetY = e.clientY - rect.top;
                 el.style.zIndex = 1000;
             });
+
             el.addEventListener('pointermove', (e) => {
                 if (wObj.isDragging && e.pointerId === wObj.pointerId) {
+                    const lane = document.getElementById(`lane-${wObj.pIdx}`);
                     const laneRect = lane.getBoundingClientRect();
                     wObj.x = e.clientX - laneRect.left - wObj.offsetX;
                     wObj.y = e.clientY - laneRect.top - wObj.offsetY;
                     el.style.transform = `translate(${Math.floor(wObj.x)}px, ${Math.floor(wObj.y)}px)`;
                 }
             });
+
             const stopDrag = (e) => {
                 if (wObj.isDragging && e.pointerId === wObj.pointerId) {
                     wObj.isDragging = false; el.releasePointerCapture(e.pointerId);
-                    el.style.zIndex = 100; checkDrop(wObj);
+                    el.style.zIndex = 100; handleAction(wObj, false);
                 }
             };
             el.addEventListener('pointerup', stopDrag);
             el.addEventListener('pointercancel', stopDrag);
         }
 
-        function checkDrop(wObj) {
-            const pIdx = wObj.pIdx; const state = activeSentences[pIdx];
+        function handleAction(wObj, isTap) {
+            const pIdx = wObj.pIdx; 
+            const state = activeSentences[pIdx];
+            if(playerConfigs[pIdx].finished || playerConfigs[pIdx].frozen) return;
+
             const targetChar = state.words[state.currentWordIdx];
             const slot = document.getElementById(`slot-${pIdx}-${state.currentWordIdx}`);
-            if(!slot) return;
-            const sRect = slot.getBoundingClientRect(); const wRect = wObj.el.getBoundingClientRect();
-            const isOver = !(wRect.right < sRect.left || wRect.left > sRect.right || wRect.bottom < sRect.top || wRect.top > sRect.bottom);
             
-            if (isOver) {
+            let isValid = false;
+            if(isTap) {
+                isValid = true; 
+            } else {
+                const sRect = slot.getBoundingClientRect();
+                const wRect = wObj.el.getBoundingClientRect();
+                isValid = !(wRect.right < sRect.left || wRect.left > sRect.right || wRect.bottom < sRect.top || wRect.top > sRect.bottom);
+            }
+
+            if (isValid) {
                 if (wObj.el.innerText.toLowerCase() === targetChar.toLowerCase()) {
                     document.getElementById('sfx-correct').play();
-                    slot.innerText = targetChar; 
-                    slot.classList.add('filled');
+                    slot.innerText = targetChar; slot.classList.add('filled');
                     wObj.el.remove(); wordsInPlay = wordsInPlay.filter(item => item !== wObj);
                     state.currentWordIdx++; playerConfigs[pIdx].score += 10; updateScoreUI(pIdx);
                     
@@ -780,9 +794,8 @@
                         if (isSharedPace) {
                             sharedSentenceIdx++;
                             setTimeout(() => {
-                                wordsInPlay.forEach(w => w.el.remove());
-                                wordsInPlay = [];
-                                for(let i=0; i<playerCount; i++) { document.getElementById(`dock-${i}`).innerHTML = ''; setupPlayerSentence(i); }
+                                wordsInPlay.forEach(w => w.el.remove()); wordsInPlay = [];
+                                for(let i=0; i<playerCount; i++) setupPlayerSentence(i);
                             }, 800);
                         } else {
                             playerConfigs[pIdx].currentSentenceIdx++;
@@ -831,7 +844,6 @@
         function goBackToStart() {
             clearInterval(timerInterval); cancelAnimationFrame(physicsRequest);
             document.getElementById('game-boundary').innerHTML = ''; wordsInPlay = [];
-            playerConfigs.forEach(p => { p.score = 0; p.finished = false; p.frozen = false; p.currentSentenceIdx = 0; });
             document.getElementById('result-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'none';
             document.getElementById('intro-screen').style.display = 'flex';
